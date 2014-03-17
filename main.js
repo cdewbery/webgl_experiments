@@ -25,6 +25,8 @@
 
  /* default fragment and vertex shaders, if we were clever we would import these
   * from a file, rather than just hard-coding them here */
+
+/*  Texture Shader */
  var fragmentShaderSource =
     "precision mediump float;                                                 \
 	uniform sampler2D sampler;                                                \
@@ -46,18 +48,17 @@
 		vUV = uv;                                                             \
     }";
 
- var camera;
- var shaderProgram;
- var projectionMatrix;
- var viewMatrix;
- var squareVertexPositionBuffer;
- var squareTexture;
- var gl;
+var camera;
+var shaderProgram;
+var projectionMatrix;
+var viewMatrix;
+var terrain;
+var gl;
  
- /* compile the provided shaderCode and return a shader which we can then
-  * include in the shader program */ 
- function compileShader(gl, type, shaderCode) 
- {
+/* compile the provided shaderCode and return a shader which we can then
+ * include in the shader program */ 
+function compileShader(gl, type, shaderCode) 
+{
     var shader = gl.createShader(type);
     gl.shaderSource(shader, shaderCode);
     gl.compileShader(shader);
@@ -67,15 +68,15 @@
         return null;
     }
 	return shader;
- }
+}
  
- /* compile a shader program from the provided shader source
-  * @param vertexShaderCode vertex shader source code to compile
-  * @param fragmentShaderCode fragment shader source code to compile
-  * @returns shaderProgram object, or null if failed.
-  */
- function createShaderProgram(gl, vertexShaderCode, fragmentShaderCode)
- {
+/* compile a shader program from the provided shader source
+ * @param vertexShaderCode vertex shader source code to compile
+ * @param fragmentShaderCode fragment shader source code to compile
+ * @returns shaderProgram object, or null if failed.
+ */
+function createShaderProgram(gl, vertexShaderCode, fragmentShaderCode)
+{
  	var fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentShaderCode);
 	var vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexShaderCode);
 	var shader = gl.createProgram();
@@ -111,144 +112,85 @@
 	}
 	
     return shader;
- }
+}
 
- function initGL(canvas)
- {
-    var _gl;
-    try {
-        _gl = canvas.getContext("experimental-webgl") || canvas.getConext("webgl");     
-    }
-    catch(e) {}	
+function initGL(canvas)
+{
+	var _gl;
+	try {
+		_gl = canvas.getContext("experimental-webgl") || canvas.getConext("webgl");     
+	}
+	catch(e) {}	
 
-    if (!_gl) {
-        alert("Could not initialise WebGL. Your browser may not support it");
+	if (!_gl) {
+		alert("Could not initialise WebGL. Your browser may not support it");
 		return null;
 	}
 		
-     _gl.viewport(0,0, canvas.width, canvas.height);
-	 //gl.clearDepth(1.0);
-	 //gl.cullFace(gl.FRONT);
-	 _gl.clearColor(0.0, 0.0, 0.0, 1.0);
-     _gl.enable(_gl.DEPTH_TEST);
+	_gl.viewport(0,0, canvas.width, canvas.height);
+	_gl.clearDepth(1.0);
+	_gl.cullFace(_gl.FRONT);
+	_gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	_gl.enable(_gl.DEPTH_TEST);
 	 
-	 return _gl;
- }
+	return _gl;
+}
 
- function initBuffers(gl) 
- {
- 	 var vertices = [
-	    /* x,   y,   z,      u,   v */
-		 2.0,  2.0,  0.0,   0.0, 0.0,
-		-2.0,  2.0,  0.0,   1.0, 0.0,
-		 2.0, -2.0,  0.0,   0.0, 1.0,
-		-2.0, -2.0,  0.0,   1.0, 1.0,
-	 ];
+function loadImage(gl, fileURL)
+{
+	var image = new Image();
+	image.src = fileURL;
+	image.texture = null;
 
-	 squareVertexPositionBuffer = gl.createBuffer();
-	 gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-	 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
- }
+	image.onload = function(e) {
+		var texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+		image.texture = texture;
+	}
+	return image; 
+}
+
+/* Given R,G,B data in an array convert this to a WebGL texture */
+function createTextureFromArray(gl, data, width, height)
+{
+	var texture = gl.createTexture();
+
+	gl.bindTexture(gl.TEXTURE_2D, texture);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(data));
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.bindTexture(gl.TEXTURE_2D, null);    
+
+	return texture;
+}
  
- /*
- function initTerrainMesh(gl, heightMap)
- {
-     var vertices = []
-	 
-     for (var x = 0; x < 512; x++) {
-	     for (var z = 0; z < 512; z++) {
-		     var vertex = [];
-			 vertex[0] = x;
-			 vertex[1] = heightMap[x,z];
-			 vertex[2] = z;
-			 vertex[3] = 0;
-			 vertex[4] = 0;
-			 vertices.push(vertex);
-		 }
-	 }
-	 squareVertexPositionBuffer = gl.createBuffer();
-	 gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-	 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
- }
- 
- 
- function loadTextures(gl)
- {
-     //squareTexture = loadImage(gl, "terrain.png");
-	 
- }
- 
- function loadImage(gl, fileURL)
- {
-     var image = new Image();
-	 image.src = fileURL;
-	 image.texture = null;
-	 
-	 image.onload = function(e) {
-	     var texture = gl.createTexture();
-       //  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      
-         gl.bindTexture(gl.TEXTURE_2D, texture);
-         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-         gl.bindTexture(gl.TEXTURE_2D, null);
-		 image.texture = texture;
-	 }
-	 return image; 
- }
- */
- 
- function createTextureFromArray(gl, data, width, height)
- {
-         var image = new Image();
-         var texture = gl.createTexture();
-      
-         gl.bindTexture(gl.TEXTURE_2D, texture);
-         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(data));
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-         gl.bindTexture(gl.TEXTURE_2D, null);    
-		 image.texture = texture;
-		 
-		 return image;
- }
- 
- function drawFrame(gl) 
- {
-    viewMatrix = camera.view;
-	
+function drawFrame(gl) 
+{
+	viewMatrix = camera.view;
+
 	gl.useProgram(shaderProgram);
-	
+
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 					
 	gl.uniformMatrix4fv(shaderProgram.uniform.uPMatrix, false, projectionMatrix);
-    gl.uniformMatrix4fv(shaderProgram.uniform.uMVMatrix, false, viewMatrix);
+	gl.uniformMatrix4fv(shaderProgram.uniform.uMVMatrix, false, viewMatrix);
 	gl.uniform1i(shaderProgram.uniform.sampler, 0);
-    if (squareTexture.texture) {
-	    gl.activeTexture(gl.TEXTURE0);
-		gl.bindTexture(gl.TEXTURE_2D,squareTexture.texture);
-	}
-	
-	gl.bindBuffer(gl.ARRAY_BUFFER, squareVertexPositionBuffer);
-	
-	gl.enableVertexAttribArray(shaderProgram.attribute.position);
-	gl.enableVertexAttribArray(shaderProgram.attribute.uv);
-	
-	gl.vertexAttribPointer(shaderProgram.attribute.position, 3, gl.FLOAT, false, 4*(3+2), 0);
-    gl.vertexAttribPointer(shaderProgram.attribute.uv, 2, gl.FLOAT, false, 4*(3+2), 3*4);
-	
-	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
- }
+
+	terrain.render(gl);
+}
  
- function tick() 
- {
+function tick() 
+{
 	requestAnimFrame(tick);
 	drawFrame(gl);
- }
+}
  
- function main()
- {
+function main()
+{
     var canvas = document.getElementById("viewport");
 		
     gl = initGL(canvas); 	
@@ -258,19 +200,17 @@
 	mat4.perspective(45, canvas.width / canvas.height, 0.1, 100.0, projectionMatrix);
 	
 	shaderProgram = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
-	
-	initBuffers(gl);
-	//loadTextures(gl);
-	
+
 	camera = Object.create(Camera).init(canvas);
 	camera.position = [0.0, 0.0, 7.0];
 	
-	var heightMap = Object.create(DiamondSquare).init(513, 0).image;			  
-	squareTexture = createTextureFromArray(gl, heightMap, 512,512);
-	//initTerrainMesh(gl, heightMap);
+	var heightMap = Object.create(DiamondSquare).init(129, 0);
+	terrain = Object.create(Terrain).init(gl, heightMap.data, 129, 129);	  
+	terrain.texture = createTextureFromArray(gl, heightMap.image, 128, 128);
+	terrain.shaderProgram = shaderProgram;
 		 
 	requestAnimFrame(tick);
- }
- 
+}
+
  /* once the page has finished loading, kick off the main() function */
  window.addEventListener("load", main);
