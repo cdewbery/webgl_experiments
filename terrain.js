@@ -57,13 +57,19 @@ var Terrain = Object.create(Object, {
 			var halfLength = length / 2.0;
 			var index = 0;
 			
+			// create a grid of vertices like so (4x4 grid example)
+			//  (0,H,0)   0,  1,   2,   3  (4,H,0)
+			//            4,  5,   6,   7
+			//            8,  9,   10, 11
+			//  (0,H,4)   12, 13,  14, 15  (4,H,4)
+			//
 			for (var z = 0; z < length; z++) {
 				for (var x = 0; x < width; x++) {
-					vertices[index++] = x - halfWidth;      // x
-					vertices[index++] = heightMap[x][z] / this.scale;    // y
-					vertices[index++] = z - halfLength;     // z
-					vertices[index++] = x / (width - 1);    // u
-					vertices[index++] = z / (length - 1);   // v
+					vertices[index++] = (x - halfWidth)* this.scale;            // x
+					vertices[index++] = -heightMap[x][z] * (this.scale / 5);    // y
+					vertices[index++] = (z - halfLength)* this.scale;           // z
+					vertices[index++] = x / (width - 1);                        // u
+					vertices[index++] = z / (length - 1);                       // v
 				}
 			}
 			return vertices;
@@ -75,32 +81,51 @@ var Terrain = Object.create(Object, {
 
 			var indices = [];
 			var index = 0;
-			 
+			 	
+			// create indices for triangles in a zig-zag pattern
+			// to allow us to take advantage of triangle strips while
+			// only having to create 1 degenerate vertex for each row
+			//
+			//   vertices
+			//   	      0,  1,   2,   3
+			//            4,  5,   6,   7
+			//            8,  9,   10, 11
+			//            12, 13,  14, 15
+			//
+			//   indices  0,  4,  1,  5, 2, 6, 3, 7,                         
+			//           (7), 11, 6, 10, 5, 9, 4, 8, 
+			//           (8)  12, 9, 13, 10, 14, 11, 15.
+			//  				
 			for (var z = 0; z < length - 1; z++) {
 				if (z % 2 == 0) {
-					// even row, move from left to right
+					// for even rows work from left to right, creating indices for each
+				    // triangle in the row, when we reach the end of the row, check to 
+				    // see if this is the last row, and if not add a degenerate vertex to
+				    // allow us to wrap back in the other direction.
 					for (var x = 0; x < width; x++) {
 						indices[index++] = x + (z * width);
 						indices[index++] = x + (z * width) + width;
 					}
-					// insert degenerate vertex if this isn't the last row
+					// if this is not the last row, then add a degenerate (duplicate) vertex
 					if (z != length - 2) {
-						indices[index++] = --x + (z * width);
+						indices[index++] = (width - 1) + (z * width) + width;
 					}
 				}
-				else {
-				 
-					// Odd row, move from right to left
-					for ( var x = width - 1; x >= 0; x-- ) {
-						indices[index++] = x + (z * width);
+				else {				
+                    // for odd rows work from right to left, creating indices for each 
+					// triangle in the row, when we reach the end of the row check to see
+					// if this is the last row, and if not add a degenerate vertex to 
+					// allow us to wrap back in the other direction.
+		            for (var x = width - 1; x > 0; x--) {
 						indices[index++] = x + (z * width) + width;
+						indices[index++] = x + (z * width) - 1;
 					}
-					// Insert degenerate vertex if this isn't the last row
+					// if this is not the last row, then add a degenerate (duplicate) vertex
 					if (z != length - 2) {
-						index[index++] = ++x + (z * width);
+						indices[index++] = (z * width) + width;
 					}
 				}
-			}
+			}	
 			return indices;
 		}
 	},
@@ -166,8 +191,8 @@ var Terrain = Object.create(Object, {
 			gl.vertexAttribPointer(this._shaderProgram.attribute.uv,       2, gl.FLOAT, false, 20, 12);
 
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indicesBuffer);
-			//gl.drawElements(gl.TRIANGLE_STRIP, this._indicesBuffer.numIndices, gl.UNSIGNED_SHORT, 0);
 			gl.drawElements(gl.TRIANGLE_STRIP, this._indicesBuffer.numIndices, gl.UNSIGNED_SHORT, 0);
+			//gl.drawElements(gl.LINE_STRIP, this._indicesBuffer.numIndices, gl.UNSIGNED_SHORT, 0);
 		}
 	},
  
