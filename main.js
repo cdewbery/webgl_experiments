@@ -140,18 +140,20 @@ function loadImage(gl, fileURL)
 {
 	var image = new Image();
 	image.src = fileURL;
-	image.texture = null;
-
+	image.texture = gl.createTexture();
+	
+	/* generate a red texture, so we can at least see something if the texture fails to load */
+	gl.bindTexture(gl.TEXTURE_2D, image.texture);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 0, 0, 255]));
+			  
 	image.onload = function(e) {
-		var texture = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.bindTexture(gl.TEXTURE_2D, image.texture);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 		gl.bindTexture(gl.TEXTURE_2D, null);
-		image.texture = texture;
 	}
-	return image; 
+	return image.texture; 
 }
 
 /* Given R,G,B data in an array convert this to a WebGL texture */
@@ -170,6 +172,7 @@ function createTextureFromArray(gl, data, width, height)
  
 function drawFrame(gl) 
 {
+	camera.update();
 	viewMatrix = camera.view;
 
 	gl.useProgram(shaderProgram);
@@ -197,16 +200,16 @@ function main()
 	
 	projectionMatrix = mat4.create();
 	viewMatrix = mat4.create();
-	mat4.perspective(45, canvas.width / canvas.height, 0.1, 100.0, projectionMatrix);
+	mat4.perspective(45, canvas.width / canvas.height, 0.1, 10000.0, projectionMatrix);
 	
 	shaderProgram = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
 
 	camera = Object.create(Camera).init(canvas);
 	camera.position = [0.0, 0.0, 7.0];
 	
-	var heightMap = Object.create(DiamondSquare).init(129, 0);
-	terrain = Object.create(Terrain).init(gl, heightMap.data, 129, 129);	  
-	terrain.texture = createTextureFromArray(gl, heightMap.image, 128, 128);
+	var heightMap = Object.create(DiamondSquare).init(257, 0);
+	terrain = Object.create(Terrain).init(gl, heightMap.data, 256, 256);	  
+	terrain.texture = createTextureFromArray(gl, heightMap.image, 256, 256);
 	terrain.shaderProgram = shaderProgram;
 		 
 	requestAnimFrame(tick);
