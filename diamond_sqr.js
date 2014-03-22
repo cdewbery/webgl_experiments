@@ -137,13 +137,13 @@ var DiamondSquare = Object.create(Object, {
             }	
 
 			/* store the height map data into an ArrayBuffer in an RGB format */
-			this._image = new Array(((dataSize - 1) * (dataSize - 1)) * 3);
-			for (var x = 0; x < dataSize - 1; x ++) {
-			    for (var y = 0; y < dataSize - 1; y ++) {
+			this._image = new Array(((dataSize-1) * (dataSize-1)) * 3);
+			for (var x = 0; x < dataSize -1; x ++) {
+			    for (var y = 0; y < dataSize -1; y ++) {
 				    var pixel = ((this._data[x][y] - minY) / (maxY - minY)) * 255;
-				    this._image[(x + (y * dataSize - 1)) * 3 + 0] = pixel;  // red
-					this._image[(x + (y * dataSize - 1)) * 3 + 1] = pixel;  // green
-					this._image[(x + (y * dataSize - 1)) * 3 + 2] = pixel;  // blue
+				    this._image[(x + (y * (dataSize - 1))) * 3 + 0] = pixel;  // red
+					this._image[(x + (y * (dataSize - 1))) * 3 + 1] = pixel;  // green
+					this._image[(x + (y * (dataSize - 1))) * 3 + 2] = pixel;  // blue
 				}
 			}
 
